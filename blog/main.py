@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status, Response, HTTPException
 from . import schemas, models
 from .database import engine, LocalSession
 from sqlalchemy.orm import Session
+from typing import List
 
 app = FastAPI()
 
@@ -16,7 +17,7 @@ def get_db():
 
 
 
-@app.post('/blog')
+@app.post('/blog', status_code=status.HTTP_201_CREATED)
 def create(blog:schemas.Blog, db:Session = Depends(get_db)):
     new_blog = models.Blog(title = blog.title, body = blog.body)
     db.add(new_blog)
@@ -24,12 +25,43 @@ def create(blog:schemas.Blog, db:Session = Depends(get_db)):
     db.refresh(new_blog)
     return new_blog
 
-@app.get('/blog')
+
+
+@app.delete('/blog/{id}', status_code=status.HTTP_204_NO_CONTENT)
+def destroy(id: int, db: Session = Depends(get_db)):
+    db.query(models.Blog).filter(models.Blog.id == id).delete(synchronize_session=False)
+    db.commit()
+    return "deleted"
+
+
+@app.put('/blog/{id}', status_code=status.HTTP_202_ACCEPTED)
+def update_blog(blog:schemas.Blog, id:int, db: Session = Depends(get_db)):
+    db.query(models.Blog).filter(models.Blog.id == id).update(blog.dict(exclude_unset=True))
+    db.commit()
+    return "Updated"
+
+
+
+
+@app.get('/blog', response_model=List[schemas.ShowBLog])
 def get_all_blogs(db: Session = Depends(get_db)):
     blogs = db.query(models.Blog).all()
     return blogs
 
-@app.get('/blog/{id}')
-def get_blog_by_id(id:int , db: Session = Depends(get_db)):
+@app.get('/blog/{id}',status_code=200, response_model=schemas.ShowBLog)
+def get_blog_by_id(id:int , response:Response , db: Session = Depends(get_db)):
     blog = db.query(models.Blog).filter(models.Blog.id == id).first()
+    if not blog:
+        # response.status_code = status.HTTP_404_NOT_FOUND
+        # return {f"Blog with {id} is not available"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"The Blog with id: {id} is not found")
     return blog
+
+
+@app.post('/user')
+def create_user(request: schemas.User, db: Session = Depends(get_db)):
+    new_user = models.User(username = request.username, email = request.email, password = request.password )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
