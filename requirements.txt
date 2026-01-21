@@ -1,3 +1,7 @@
 fastapi[standard]
 sqlalchemy
 pydantic
+passlib
+bcrypt==3.2.2
+python-jose
+
